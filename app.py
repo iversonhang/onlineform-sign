@@ -2,50 +2,96 @@ import streamlit as st
 from streamlit_drawable_canvas import st_canvas
 from PIL import Image, ImageDraw, ImageFont
 import io
+import os
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Contractor Safety Portal", page_icon="🦺")
+# --- 1. LANGUAGE CONFIGURATION ---
+st.set_page_config(page_title="Safety Portal / 安全门户", page_icon="🦺")
 
-# --- 2. THE SAFETY AGREEMENT TEXT ---
-# You can edit the text inside the quotes below to fit your specific needs.
-SAFETY_AGREEMENT_TEXT = """
-**1. Personal Protective Equipment (PPE):** All contractors must wear appropriate PPE at all times while on site. This includes, but is not limited to, hard hats, safety glasses, high-visibility vests, and steel-toed boots.
+# Language Selector in Sidebar
+language = st.sidebar.radio("Select Language / 选择语言", ("English", "中文"))
 
-**2. Hazard Reporting:** Any unsafe conditions, equipment, or practices must be reported to the Site Supervisor immediately.
+# --- 2. TRANSLATION DICTIONARY ---
+# This holds all the text for both languages
+t = {
+    "English": {
+        "title": "🦺 Contractor Safety Agreement",
+        "instruction": "Please review the safety instructions below before signing in.",
+        "rules_title": "Safety Rules:",
+        "rules_text": """
+        **1. PPE:** Wear hard hats, safety glasses, and boots at all times.
+        **2. Reporting:** Report unsafe conditions to the Supervisor immediately.
+        **3. Emergency:** Know the evacuation plan and assembly points.
+        **4. Tools:** Use only tools that are in good working condition.
+        **5. Substance:** Zero tolerance for drugs and alcohol.
+        """,
+        "checkbox": "✅ I acknowledge that I have read and understood the Safety Agreement.",
+        "success_msg": "Thank you. Please fill in your details below.",
+        "lbl_name": "Full Name",
+        "lbl_company": "Company Name",
+        "lbl_date": "Date of Signing",
+        "sign_here": "**Sign Below:**",
+        "btn_download": "📥 Download Signed Agreement",
+        "warning_fill": "⚠️ Please fill in your Name and Company.",
+        "warning_tick": "👆 Please tick the box above to proceed.",
+        "doc_header": "CONTRACTOR SAFETY ACKNOWLEDGEMENT",
+        "doc_body": "I hereby confirm that I have read and agree to the safety instructions.",
+        "doc_sign_label": "Signature:"
+    },
+    "中文": {
+        "title": "🦺 承包商安全协议",
+        "instruction": "请在签到前阅读以下安全说明。",
+        "rules_title": "安全规则：",
+        "rules_text": """
+        **1. 个人防护装备 (PPE):** 必须始终佩戴安全帽、护目镜和安全靴。
+        **2. 报告:** 发现任何不安全状况立即向主管报告。
+        **3. 紧急情况:** 熟悉紧急疏散计划和集合点。
+        **4. 工具:** 仅使用状况良好的工具。
+        **5. 违禁品:** 严禁携带毒品和酒精进场。
+        """,
+        "checkbox": "✅ 我确认已阅读并理解安全协议。",
+        "success_msg": "谢谢。请在下方填写您的详细信息。",
+        "lbl_name": "全名",
+        "lbl_company": "公司名称",
+        "lbl_date": "签署日期",
+        "sign_here": "**请在下方签名：**",
+        "btn_download": "📥 下载已签署协议",
+        "warning_fill": "⚠️ 请填写您的姓名和公司。",
+        "warning_tick": "👆 请先勾选上方选框以继续。",
+        "doc_header": "承包商安全确认书",
+        "doc_body": "本人特此确认已阅读并同意遵守上述安全指示。",
+        "doc_sign_label": "签名："
+    }
+}
 
-**3. Emergency Procedures:** Contractors must familiarize themselves with the site emergency evacuation plan and assembly points upon arrival.
-
-**4. Tools and Equipment:** All tools brought onto the site must be in good working condition and meet safety standards.
-
-**5. Drug and Alcohol Policy:** Zero tolerance policy for drugs and alcohol. Anyone found under the influence will be removed from the site immediately.
-"""
+# Select the dictionary based on language choice
+current_text = t[language]
 
 # --- 3. UI LAYOUT ---
-st.title("🦺 Contractor Safety Agreement")
-st.markdown("Please review the safety instructions below before signing in.")
+st.title(current_text["title"])
+st.markdown(current_text["instruction"])
 
-# Display the agreement in a scrollable box or clearly on screen
+# Display Rules
 with st.container(border=True):
-    st.markdown(SAFETY_AGREEMENT_TEXT)
+    st.markdown(f"### {current_text['rules_title']}")
+    st.markdown(current_text["rules_text"])
 
-# The "I have read" Tick Box
-agreed = st.checkbox("✅ I acknowledge that I have read and understood the Safety Agreement and Instructions.")
+# Acknowledgement Checkbox
+agreed = st.checkbox(current_text["checkbox"])
 
-# --- 4. CONDITIONAL FORM (Only shows if they tick the box) ---
+# --- 4. CONDITIONAL FORM ---
 if agreed:
-    st.success("Thank you. Please fill in your details below.")
+    st.success(current_text["success_msg"])
     st.write("---")
 
-    # Form Inputs
     col1, col2 = st.columns(2)
     with col1:
-        name = st.text_input("Full Name")
+        name = st.text_input(current_text["lbl_name"])
     with col2:
-        company = st.text_input("Company Name")
+        company = st.text_input(current_text["lbl_company"])
 
-    date = st.date_input("Date of Signing")
+    date = st.date_input(current_text["lbl_date"])
 
-    st.write("**Sign Below:**")
+    st.write(current_text["sign_here"])
 
     # Signature Canvas
     canvas_result = st_canvas(
@@ -59,60 +105,73 @@ if agreed:
         key="signature_canvas",
     )
 
-    # --- 5. IMAGE GENERATION & DOWNLOAD ---
+    # --- 5. IMAGE GENERATION ---
     if canvas_result.image_data is not None:
-        # We check if Name and Company are filled before allowing download
         if name and company:
             
-            # Convert canvas data to an image
+            # A. LOAD FONT (Crucial for Chinese)
+            try:
+                # Try to load 'font.ttf' from the same folder
+                # If you use Chinese, you MUST have a font.ttf file supporting Chinese characters.
+                font_path = "font.ttf" 
+                if os.path.exists(font_path):
+                    custom_font = ImageFont.truetype(font_path, 20)
+                    header_font = ImageFont.truetype(font_path, 28)
+                else:
+                    # Fallback if file not found (Chinese will break here)
+                    custom_font = ImageFont.load_default()
+                    header_font = ImageFont.load_default()
+                    if language == "中文":
+                        st.warning("Font file not found. Chinese characters may not display correctly on the image.")
+            except Exception as e:
+                custom_font = ImageFont.load_default()
+
+            # B. CREATE IMAGE
             img_data = canvas_result.image_data.astype('uint8')
             signature_img = Image.fromarray(img_data)
             
-            # Create a blank white "Paper" (600px wide x 500px tall)
             final_document = Image.new("RGB", (600, 500), "white")
             draw = ImageDraw.Draw(final_document)
-            
-            # Draw the Text Info
-            # (In a real app, you might want to load a .ttf font, but default is fine here)
             black = (0, 0, 0)
-            draw.text((20, 20), "CONTRACTOR SAFETY ACKNOWLEDGEMENT", fill=black)
-            draw.line((20, 35, 580, 35), fill=black, width=2)
             
-            draw.text((20, 60), f"I, {name}, representing {company},", fill=black)
-            draw.text((20, 80), f"hereby confirm that I have read and agree to the", fill=black)
-            draw.text((20, 100), f"Contractor Safety Agreement instructions on {date}.", fill=black)
+            # C. DRAW TEXT
+            # Header
+            draw.text((20, 20), current_text["doc_header"], fill=black, font=header_font)
+            draw.line((20, 55, 580, 55), fill=black, width=2)
             
-            draw.text((20, 150), f"Name: {name}", fill=black)
-            draw.text((20, 170), f"Company: {company}", fill=black)
-            draw.text((20, 190), f"Date: {date}", fill=black)
+            # Body
+            draw.text((20, 70), f"{current_text['lbl_name']}: {name}", fill=black, font=custom_font)
+            draw.text((20, 100), f"{current_text['lbl_company']}: {company}", fill=black, font=custom_font)
+            draw.text((20, 130), f"{current_text['lbl_date']}: {date}", fill=black, font=custom_font)
             
-            draw.text((20, 240), "Signature:", fill=black)
+            # Statement
+            draw.text((20, 170), current_text["doc_body"], fill=black, font=custom_font)
+            
+            # Signature Label
+            draw.text((20, 240), current_text["doc_sign_label"], fill=black, font=custom_font)
 
-            # Paste the signature image at the bottom
-            # We resize it slightly to fit nicely if needed, or paste directly
-            final_document.paste(signature_img, (0, 260))
+            # Paste Signature
+            final_document.paste(signature_img, (0, 260), signature_img) # Use signature_img as mask if transparent
             
-            # Save to Memory Buffer
+            # Save to buffer
             buffer = io.BytesIO()
             final_document.save(buffer, format="PNG")
             btn_data = buffer.getvalue()
             
-            filename = f"Safety_Agreement_{name.replace(' ', '_')}_{date}.png"
+            filename = f"Signed_{name}_{date}.png"
 
             st.write("---")
-            st.image(final_document, caption="Document Preview", width=400)
+            st.image(final_document, caption="Preview", width=400)
             
             st.download_button(
-                label="📥 Download Signed Agreement",
+                label=current_text["btn_download"],
                 data=btn_data,
                 file_name=filename,
                 mime="image/png"
             )
         else:
-            # If signature exists but details are missing
-            if canvas_result.json_data is not None and len(canvas_result.json_data["objects"]) > 0:
-                 st.warning("⚠️ Please fill in your Name and Company to finish.")
+             if canvas_result.json_data is not None and len(canvas_result.json_data["objects"]) > 0:
+                 st.warning(current_text["warning_fill"])
 
 else:
-    # This shows if the box is NOT ticked
-    st.info("👆 Please tick the box above to proceed to the signature form.")
+    st.info(current_text["warning_tick"])
