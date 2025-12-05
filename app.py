@@ -109,22 +109,22 @@ if agreed:
     if canvas_result.image_data is not None:
         if name and company:
             
-            # A. LOAD FONT (Crucial for Chinese)
+# A. LOAD FONT (Crucial for Chinese)
             try:
-                # Try to load 'font.ttf' from the same folder
-                # If you use Chinese, you MUST have a font.ttf file supporting Chinese characters.
                 font_path = "font.ttf" 
                 if os.path.exists(font_path):
                     custom_font = ImageFont.truetype(font_path, 20)
                     header_font = ImageFont.truetype(font_path, 28)
                 else:
-                    # Fallback if file not found (Chinese will break here)
+                    # Fallback if file not found
                     custom_font = ImageFont.load_default()
                     header_font = ImageFont.load_default()
                     if language == "中文":
-                        st.warning("Font file not found. Chinese characters may not display correctly on the image.")
+                        st.warning("⚠️ Font file 'font.ttf' not found. Chinese text will appear as squares.")
             except Exception as e:
+                # Fallback if any error occurs during font loading
                 custom_font = ImageFont.load_default()
+                header_font = ImageFont.load_default()  # <--- This line was missing!
 
             # B. CREATE IMAGE
             img_data = canvas_result.image_data.astype('uint8')
