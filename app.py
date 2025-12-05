@@ -101,4 +101,177 @@ t = {
     }
 }
 
-current
+current_text = t[language]
+
+# --- 4. UI DISPLAY ---
+st.title(current_text["school_name"])
+st.subheader(current_text["title"])
+st.markdown(current_text["instruction"])
+
+# Show Rules on Screen
+with st.container(border=True):
+    st.markdown(f"### {current_text['rules_title']}")
+    st.markdown(current_text["rules_text"])
+
+agreed = st.checkbox(current_text["checkbox"])
+
+if agreed:
+    st.success(current_text["success_msg"])
+    st.write("---")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        name = st.text_input(current_text["lbl_name"])
+    with col2:
+        company = st.text_input(current_text["lbl_company"])
+
+    date = st.date_input(current_text["lbl_date"])
+
+    st.write(current_text["sign_here"])
+
+    # Signature Canvas
+    canvas_result = st_canvas(
+        fill_color="rgba(255, 165, 0, 0.3)",
+        stroke_width=2,
+        stroke_color="#000000",
+        background_color="#ffffff",
+        height=150,
+        width=600,
+        drawing_mode="freedraw",
+        key="signature_canvas",
+    )
+
+    # --- 5. IMAGE GENERATION LOGIC ---
+    if canvas_result.image_data is not None:
+        if name and company:
+            
+            # --- A. LOAD FONTS ---
+            try:
+                font_path = "font.ttf"
+                if os.path.exists(font_path):
+                    font_header = ImageFont.truetype(font_path, 36) # School Name
+                    font_sub = ImageFont.truetype(font_path, 28)    # Title
+                    font_body = ImageFont.truetype(font_path, 20)   # Text
+                    font_bold = ImageFont.truetype(font_path, 24)   # Bold text
+                else:
+                    raise Exception("Font not found")
+            except Exception:
+                font_header = ImageFont.load_default()
+                font_sub = ImageFont.load_default()
+                font_body = ImageFont.load_default()
+                font_bold = ImageFont.load_default()
+
+            # --- B. PREPARE CONTENT ---
+            IMG_WIDTH = 800
+            MARGIN = 50
+            CONTENT_WIDTH = IMG_WIDTH - (MARGIN * 2)
+            
+            # Wrap Rules
+            wrapped_rules = wrap_text(current_text["rules_text"], font_body, CONTENT_WIDTH)
+            
+            # Calculate Height
+            cursor_y = 50 
+            
+            # Add Logo Space if it exists
+            has_logo = os.path.exists("logo.png")
+            if has_logo:
+                cursor_y += 100 # Reserve 100px height for logo
+            
+            cursor_y += 50 # School Name
+            cursor_y += 40 # Title
+            cursor_y += 30 # Spacer
+            
+            # Rules Height
+            line_height = 30
+            rules_height = len(wrapped_rules) * line_height
+            cursor_y += rules_height + 40 
+            
+            # Form & Signature Height
+            cursor_y += 150 # Form details
+            cursor_y += 150 # Signature
+            
+            TOTAL_HEIGHT = cursor_y + 50
+
+            # --- C. DRAW THE IMAGE ---
+            final_document = Image.new("RGB", (IMG_WIDTH, TOTAL_HEIGHT), "white")
+            draw = ImageDraw.Draw(final_document)
+            black = (0, 0, 0)
+            
+            # Reset Cursor
+            y = 50
+            
+            # 1. Draw Logo
+            if has_logo:
+                logo_img = Image.open("logo.png")
+                # Resize logo to max height 80px, maintain aspect ratio
+                logo_img.thumbnail((400, 80)) 
+                # Paste logo (using itself as mask if transparent)
+                if logo_img.mode == 'RGBA':
+                    final_document.paste(logo_img, (MARGIN, y), logo_img)
+                else:
+                    final_document.paste(logo_img, (MARGIN, y))
+                y += 100 # Move down past logo
+
+            # 2. Draw Headers
+            draw.text((MARGIN, y), current_text["school_name"], fill="#003366", font=font_header) # AISHK Blue-ish color
+            y += 45
+            draw.text((MARGIN, y), current_text["title"], fill=black, font=font_sub)
+            y += 40
+            draw.line((MARGIN, y, IMG_WIDTH - MARGIN, y), fill=black, width=2)
+            y += 30
+            
+            # 3. Draw Rules
+            draw.text((MARGIN, y), current_text["rules_title"], fill=black, font=font_bold)
+            y += 30
+            for line in wrapped_rules:
+                draw.text((MARGIN, y), line, fill=black, font=font_body)
+                y += line_height
+            
+            y += 40
+            
+            # 4. Draw Declaration & Details
+            draw.line((MARGIN, y, IMG_WIDTH - MARGIN, y), fill=black, width=1)
+            y += 20
+            draw.text((MARGIN, y), current_text["doc_declaration"], fill=black, font=font_bold)
+            y += 50
+            
+            draw.text((MARGIN, y), f"{current_text['lbl_name']}: {name}", fill=black, font=font_body)
+            y += 30
+            draw.text((MARGIN, y), f"{current_text['lbl_company']}: {company}", fill=black, font=font_body)
+            y += 30
+            draw.text((MARGIN, y), f"{current_text['lbl_date']}: {date}", fill=black, font=font_body)
+            y += 50
+            
+            # 5. Paste Signature
+            draw.text((MARGIN, y), current_text["doc_sign_label"], fill=black, font=font_bold)
+            
+            sig_data = canvas_result.image_data.astype('uint8')
+            signature_img = Image.fromarray(sig_data)
+            
+            # Resize signature slightly if it's too big
+            signature_img.thumbnail((400, 150))
+            
+            # Paste
+            final_document.paste(signature_img, (MARGIN, y + 30), signature_img)
+            
+            # --- D. DOWNLOAD ---
+            buffer = io.BytesIO()
+            final_document.save(buffer, format="PNG")
+            btn_data = buffer.getvalue()
+            
+            filename = f"AISHK_Safety_{name}_{date}.png"
+
+            st.write("---")
+            st.image(final_document, caption="Signed Document Preview", width=600)
+            
+            st.download_button(
+                label=current_text["btn_download"],
+                data=btn_data,
+                file_name=filename,
+                mime="image/png"
+            )
+        else:
+             if canvas_result.json_data is not None and len(canvas_result.json_data["objects"]) > 0:
+                 st.warning(current_text["warning_fill"])
+else:
+    st.info(current_text["warning_tick"])
